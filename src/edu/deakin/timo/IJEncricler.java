@@ -19,6 +19,9 @@ import java.awt.Rectangle;
 import ij.gui.Roi;
 import ij.gui.PolygonRoi;
 import ij.plugin.frame.RoiManager;
+/*Settings*/
+import java.awt.Frame;
+import java.awt.Window;
 /*Own classes*/
 import edu.deakin.timo.pixelFeatures.*;
 import edu.deakin.timo.roiTools.*;
@@ -27,7 +30,6 @@ import edu.deakin.timo.detectEdges.*;
 /** class IJEncricler.
 */
 public class IJEncricler implements PlugIn{
-	EncriclerOptions options;
 	public void run(String arg) {
 		IJ.log("Started Encircler Plugin");
 		ImagePlus imp = WindowManager.getCurrentImage();
@@ -43,12 +45,20 @@ public class IJEncricler implements PlugIn{
 		}
 		
 		/*Get options*/
-		Frame optionsFrame = WindowManage.getWindow("EncriclerOptions");
-		if (optionsFrame == null){
-			optionsFrame = new EncirclerOptions();
+		Window optionsWindow = WindowManager.getWindow("EncirclerOptions");
+		EncirclerOptions options;
+		if (optionsWindow == null){
+			options = new EncirclerOptions();
+		}else{
+			if (optionsWindow instanceof edu.deakin.timo.EncirclerOptions){
+				options = (EncirclerOptions) optionsWindow;
+			}else{
+				options = new EncirclerOptions();	//Should never get here!
+			}
 		}
-		String[] settings = optionsFrame.getSettings();
-		optionsFrame.saveSettings();
+		String[] settings = options.getSettings();
+		options.saveSettings();
+		
 		for (int i = 0;i<settings.length;++i){
 			IJ.log("Settings "+i+" "+settings[i]);
 		}
