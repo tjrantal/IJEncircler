@@ -27,6 +27,7 @@ import edu.deakin.timo.detectEdges.*;
 /** class IJEncricler.
 */
 public class IJEncricler implements PlugIn{
+	EncriclerOptions options;
 	public void run(String arg) {
 		IJ.log("Started Encircler Plugin");
 		ImagePlus imp = WindowManager.getCurrentImage();
@@ -41,8 +42,16 @@ public class IJEncricler implements PlugIn{
 			return;
 		}
 		
-		/**/
-
+		/*Get options*/
+		Frame optionsFrame = WindowManage.getWindow("EncriclerOptions");
+		if (optionsFrame == null){
+			optionsFrame = new EncirclerOptions();
+		}
+		String[] settings = optionsFrame.getSettings();
+		optionsFrame.saveSettings();
+		for (int i = 0;i<settings.length;++i){
+			IJ.log("Settings "+i+" "+settings[i]);
+		}
 		/*Get image data*/
 		int width = imp.getWidth();
 		int height = imp.getHeight();
