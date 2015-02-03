@@ -30,8 +30,11 @@ import edu.deakin.timo.detectEdges.*;
 /** class IJEncricler.
 */
 public class IJEncricler implements PlugIn{
+	int skip;
+	double threshold;
+	boolean invert;
 	public void run(String arg) {
-		IJ.log("Started Encircler Plugin");
+		//IJ.log("Started Encircler Plugin");
 		ImagePlus imp = WindowManager.getCurrentImage();
        	 /*Check that an image was open*/
 		if (imp == null) {
@@ -45,13 +48,18 @@ public class IJEncricler implements PlugIn{
 		}
 		
 		/*Get options*/
-		Window optionsWindow = WindowManager.getWindow("EncirclerOptions");
+		Frame[] frames = Frame.getFrames();
+		int fr = 0;
+		while (fr < frames.length && frames[fr].getTitle() != "EncirclerOptions"){
+			++fr;
+		}
+		
 		EncirclerOptions options;
-		if (optionsWindow == null){
+		if (fr>= frames.length || frames[fr].getTitle() != "EncirclerOptions"){
 			options = new EncirclerOptions();
 		}else{
-			if (optionsWindow instanceof edu.deakin.timo.EncirclerOptions){
-				options = (EncirclerOptions) optionsWindow;
+			if (frames[fr] instanceof edu.deakin.timo.EncirclerOptions){
+				options = (EncirclerOptions) frames[fr];
 			}else{
 				options = new EncirclerOptions();	//Should never get here!
 			}
@@ -59,8 +67,12 @@ public class IJEncricler implements PlugIn{
 		String[] settings = options.getSettings();
 		options.saveSettings();
 		
+		threshold = Double.parseDouble(settings[0]);
+		invert = settings[1] == "true" ? true : false;
+		skip = Integer.parseInt(settings[2]) > 0 ? Integer.parseInt(settings[2]) : 1; /*1 is min skip*/
+		
 		for (int i = 0;i<settings.length;++i){
-			IJ.log("Settings "+i+" "+settings[i]);
+			//IJ.log("Settings "+i+" "+settings[i]);
 		}
 		/*Get image data*/
 		int width = imp.getWidth();
@@ -72,35 +84,54 @@ public class IJEncricler implements PlugIn{
 				data[c][r] = (double) pixels[c+r*width];
 			}
 		}
-		IJ.log("Got data");
+		//IJ.log("Got data");
 		/**Apply ROI mask*/
 		byte[][] roiMask = getRoiMask(imp);
-		IJ.log("Got ROI");
+		//IJ.log("Got ROI");
 		/*Threshold binary*/
 		double[] minMax = new double[]{Filters.min(data),Filters.max(data)};
-		IJ.log("Min "+minMax[0]+" max "+minMax[1]);
-		double threshold = (minMax[1]-minMax[0])/10d+minMax[0];
-		IJ.log("Threshold "+threshold);
+		//IJ.log("Min "+minMax[0]+" max "+minMax[1]);
+		//double threshold = (minMax[1]-minMax[0])/10d+minMax[0];
+		//IJ.log("Threshold "+threshold+" Invert "+invert);
 		byte[][] binaryMask = new byte[width][height];
 		for (int r = 0;r<height;++r){
 			for (int c = 0;c<width;++c){
 				if (data[c][r] >= threshold && roiMask[c][r] > 0){	/*If within ROI and above threshold, include in binary image*/
-					binaryMask[c][r] = 1;
+					binaryMask[c][r] = (byte) (invert == false ? 1:0);
+				} else if (roiMask[c][r] > 0) {
+					binaryMask[c][r] = (byte) (invert == false ? 0:1);
+				} else {
+					binaryMask[c][r] = (byte) 0;
 				}
 			}
 		}
+		
+		/*Visualize binaryMask*/
+		/*
+		ImagePlus resultImage = NewImage.createByteImage("Binary Image",width,height,1, NewImage.FILL_BLACK);
+		byte[] rPixels = (byte[])resultImage.getProcessor().getPixels();
+		for (int r = 0;r<height;++r){
+			for (int c = 0;c<width;++c){
+				rPixels[c+r*width] = binaryMask[c][r];
+			}
+		}
+		imp.getCalibration().copy();
+		resultImage.setDisplayRange(0, 1);
+        resultImage.show();
+		*/
+		
 		EdgeDetector ed = new EdgeDetector(binaryMask);
 		Vector<DetectedEdge> edges = ed.edges;
-		IJ.log("Got edges "+edges.size());
+		//IJ.log("Got edges "+edges.size());
 		Collections.sort(edges);
-		DetectedEdge longestEdge = edges.get(0);
-		IJ.log("Edge length "+longestEdge.iit.size());
+		DetectedEdge longestEdge = edges.get(edges.size()-1);
+		//IJ.log("Edge length "+longestEdge.iit.size());
 		Polygon polygon = new Polygon();
-		for (int j = 0;j<longestEdge.iit.size();j = j+5){
+		for (int j = 0;j<longestEdge.iit.size();j = j+skip){
 			polygon.addPoint(longestEdge.iit.get(j),longestEdge.jiit.get(j));
 		}
 		//polygon.addPoint(longestEdge.iit.get(0),longestEdge.jiit.get(0));	/*Add the initial point the 2nd time*/
-		IJ.log("Polygon accumulated "+polygon.npoints);
+		//IJ.log("Polygon accumulated "+polygon.npoints);
 		PolygonRoi roi = new PolygonRoi(polygon,Roi.POLYGON);
 		/**Use colours to highlight ROIs*/
 		roi.setStrokeColor(new Color(0f,1f,0f));

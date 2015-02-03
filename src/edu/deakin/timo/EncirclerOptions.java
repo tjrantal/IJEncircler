@@ -21,8 +21,10 @@ public class EncirclerOptions extends JFrame {
 		/*Get Preferences*/
 		settings = new String[keys.length];
 		preferences = Preferences.userRoot().node(this.getClass().getName());
+		//System.out.println("Get prefs from storage");
 		for (int i = 0; i<keys.length;++i){
 			settings[i] = preferences.get(keys[i],defaults[i]); /*Use current working directory as default*/
+			//System.out.println("Storage "+keys[i]+" "+settings[i]);
 		}
 		
 		textFields = new JTextField[2];
@@ -35,9 +37,11 @@ public class EncirclerOptions extends JFrame {
 		textFields[0] = new JTextField(settings[0],6);
 		selections.add(textFields[0]);
 		/*Invert*/
+		selections.add(new JLabel("Invert intensity"));
 		checkBox = new JCheckBox();
-		if (settings[1] == "true"){
+		if (Boolean.parseBoolean(settings[1]) == true){
 			checkBox.setSelected(true);
+			//System.out.println("Check selected");
 		}else{
 			checkBox.setSelected(false);
 		}
@@ -46,15 +50,20 @@ public class EncirclerOptions extends JFrame {
 		selections.add(new JLabel("Skip Pixels"));
 		textFields[1] = new JTextField(settings[2],6);
 		selections.add(textFields[1]);
-		this.add(selections);
+		selections.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+		selections.setPreferredSize(new Dimension(200,100));
+		this.getContentPane().add(selections);
 		this.setLocation(20,20);
+		this.pack();
 		this.setVisible(true);		
 	}
 	
 	public void saveSettings(){
 		/*Save Preferences*/
+		//System.out.println("Saving prefs");
 		for (int i = 0; i<keys.length;++i){
 			preferences.put(keys[i],settings[i]);
+			//System.out.println(keys[i]+" "+settings[i]);
 		}
 
 	}
