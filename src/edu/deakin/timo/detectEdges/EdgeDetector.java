@@ -34,13 +34,41 @@ public class EdgeDetector{
 	private int height;
 	private int width;
 	private byte[][] image;
+	private boolean cleavingEnabled;
+	private double minRatio;
+	private double minLength;
 	byte threshold = 1;
 	public Vector<DetectedEdge> edges;
+	
+	public EdgeDetector(byte[][] image, boolean cleavingEnabled,double minRatio,double minLength){
+		this.image = image;
+		width =image.length;
+		height =image[0].length;
+		//IJ.log("w "+width+" h "+height);
+		this.cleavingEnabled = cleavingEnabled;
+		this.minRatio = minRatio;
+		this.minLength = minLength;
+		edges = findEdge();	//Trace bone edges	
+	}
+	
+	public EdgeDetector(byte[][] image, boolean cleavingEnabled){
+		this.image = image;
+		width =image.length;
+		height =image[0].length;
+		//IJ.log("w "+width+" h "+height);
+		this.cleavingEnabled = cleavingEnabled;
+		minRatio = 5;
+		minLength = 6;
+		edges = findEdge();	//Trace bone edges	
+	}
 	
 	public EdgeDetector(byte[][] image){
 		this.image = image;
 		width =image.length;
 		height =image[0].length;
+		cleavingEnabled = true;
+		minRatio = 5;
+		minLength = 6;
 		//IJ.log("w "+width+" h "+height);
 		edges = findEdge();	//Trace bone edges	
 	}
@@ -93,8 +121,11 @@ public class EdgeDetector{
 			allEdges.add(returned);
 			
 			int checkEdge = 0;
+			TracedEdge[] cleaved = null;
 			while (checkEdge < allEdges.size()){
-				TracedEdge[] cleaved = cleaveEdge(allEdges.get(checkEdge),5d,6d);
+				if (cleavingEnabled){
+					cleaved = cleaveEdge(allEdges.get(checkEdge),minRatio,minLength);
+				}
 				if (cleaved != null){
 					for (int c = 0;c<cleaved.length;++c){
 						allEdges.add(cleaved[c]);

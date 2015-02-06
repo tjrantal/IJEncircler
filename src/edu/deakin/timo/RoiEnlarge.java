@@ -29,10 +29,8 @@ import edu.deakin.timo.detectEdges.*;
 
 /** class IJEncricler.
 */
-public class IJEncricler implements PlugIn{
-	int skip;
-	double threshold;
-	boolean invert;
+public class RoiEnlarge implements PlugIn{
+	/*Implement PlugIn*/
 	public void run(String arg) {
 		//IJ.log("Started Encircler Plugin");
 		ImagePlus imp = WindowManager.getCurrentImage();
@@ -66,41 +64,27 @@ public class IJEncricler implements PlugIn{
 		}
 		String[] settings = options.getSettings();
 		options.saveSettings();
-		
-		threshold = Double.parseDouble(settings[0]);
-		invert = settings[1] == "true" ? true : false;
-		skip = Integer.parseInt(settings[2]) > 0 ? Integer.parseInt(settings[2]) : 1; /*1 is min skip*/
-		
-
-		/*Get image data*/
+		/*
+		for (int i =0;i<settings.length;++i){
+			System.out.println(options.keys[i]+" "+settings[i]);
+		}
+		*/
+		int enlargeBy = Integer.parseInt(settings[6]);
+		int skip = Integer.parseInt(settings[2]) > 0 ? Integer.parseInt(settings[2]) : 1; /*1 is min skip*/
 		int width = imp.getWidth();
 		int height = imp.getHeight();
-		short[] pixels = (short[]) imp.getProcessor().getPixels();
-		double[][] data = new double[width][height];
-		for (int r = 0;r<height;++r){
-			for (int c = 0;c<width;++c){
-				data[c][r] = (double) pixels[c+r*width];
-			}
-		}
-		//IJ.log("Got data");
 		/**Apply ROI mask*/
 		byte[][] roiMask = getRoiMask(imp);
-		//IJ.log("Got ROI");
-		/*Threshold binary*/
-		double[] minMax = new double[]{Filters.min(data),Filters.max(data)};
-		//IJ.log("Min "+minMax[0]+" max "+minMax[1]);
-		//double threshold = (minMax[1]-minMax[0])/10d+minMax[0];
-		//IJ.log("Threshold "+threshold+" Invert "+invert);
 		byte[][] binaryMask = new byte[width][height];
+		int roiPixels = 0;
 		for (int r = 0;r<height;++r){
 			for (int c = 0;c<width;++c){
-				if (data[c][r] >= threshold && roiMask[c][r] > 0){	/*If within ROI and above threshold, include in binary image*/
-					binaryMask[c][r] = (byte) (invert == false ? 1:0);
-				} else if (roiMask[c][r] > 0) {
-					binaryMask[c][r] = (byte) (invert == false ? 0:1);
+				if (roiMask[c][r] > 0){	/*If within ROI and above threshold, include in binary image*/
+					binaryMask[c][r] = (byte) 1;
+					++roiPixels;
 				} else {
 					binaryMask[c][r] = (byte) 0;
-				}
+				} 
 			}
 		}
 		
@@ -118,7 +102,7 @@ public class IJEncricler implements PlugIn{
         resultImage.show();
 		*/
 
-		EdgeDetector ed = new EdgeDetector(binaryMask,Boolean.parseBoolean(settings[3]),Double.parseDouble(settings[4]),Double.parseDouble(settings[5]));
+		EdgeDetector ed = new EdgeDetector(binaryMask,false);	/*Do not allow cleaving ever*/
 		Vector<DetectedEdge> edges = ed.edges;
 		//IJ.log("Got edges "+edges.size());
 		Collections.sort(edges);
@@ -128,19 +112,38 @@ public class IJEncricler implements PlugIn{
 		for (int j = 0;j<longestEdge.iit.size();j = j+skip){
 			polygon.addPoint(longestEdge.iit.get(j),longestEdge.jiit.get(j));
 		}
+		//System.out.println("Get centre "+polygon.npoints);
+		//Enlarge ROI from centre of pixel area
+		double[] centreCoordinates = new double[2];
+		roiPixels = 0;
+		for (int j = 0;j< height;++j){
+			for (int i = 0; i < width;++i){
+				if (binaryMask[i][j] == 1){
+					centreCoordinates[0]+=(double) i;
+					centreCoordinates[1]+=(double) j;
+					++roiPixels;
+				}
+			}
+		}
+		centreCoordinates[0]/=(double)roiPixels;
+		centreCoordinates[1]/=(double)roiPixels;
+		//System.out.println("X "+centreCoordinates[0]+" Y "+centreCoordinates[1]);
+		/*Calc polar coordinates, increment r by enlargeBy and calculate the enlarged ROI*/
+		double x,y,r,t;
+		for (int i =0;i<polygon.npoints;++i){
+			x = ((double)polygon.xpoints[i])-centreCoordinates[0];
+			y = ((double)polygon.ypoints[i])-centreCoordinates[1];
+			t = Math.atan2(y,x);	//Theta
+			r = Math.sqrt(x*x+y*y)+enlargeBy;	//r+5
+			polygon.xpoints[i] = (int) (centreCoordinates[0]+r*Math.cos(t));
+			polygon.ypoints[i] = (int) (centreCoordinates[1]+r*Math.sin(t));
+		}
+		
 		//polygon.addPoint(longestEdge.iit.get(0),longestEdge.jiit.get(0));	/*Add the initial point the 2nd time*/
 		//IJ.log("Polygon accumulated "+polygon.npoints);
 		PolygonRoi roi = new PolygonRoi(polygon,Roi.POLYGON);
 		/**Use colours to highlight ROIs*/
-		roi.setStrokeColor(new Color(0f,1f,0f));
-
-		RoiManager rMan;
-		if (RoiManager.getInstance() == null){
-			rMan = new RoiManager();
-		}else{
-			rMan = RoiManager.getInstance();
-		}
-		rMan.addRoi(roi);
+		roi.setStrokeColor(new Color(0f,0f,1f));
 		imp.setRoi(roi);
 		
     }
